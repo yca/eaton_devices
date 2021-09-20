@@ -10,6 +10,22 @@ include_directories(${CMAKE_CURRENT_LIST_DIR})
 
 add_executable(eaton_devices main.cpp
     uuid.h
+	device.cpp
+	device.h
+	measurement.cpp
+	measurement.h
+	transport.cpp
+	transport.h
+	hub.cpp
+	hub.h
+	transports/udptransport.cpp
+	transports/udptransport.h
+	measurements/temperaturemeasurement.cpp
+	measurements/temperaturemeasurement.h
+	measurements/pressuremeasurement.cpp
+	measurements/pressuremeasurement.h
+	measurements/humiditymeasurement.cpp
+	measurements/humiditymeasurement.h
     ${PROJECT_ROOT}/3rdparty/loguru/loguru.cpp
     ${PROJECT_ROOT}/3rdparty/loguru/loguru.hpp
     ${PROJECT_ROOT}/3rdparty/loguru/debug.h
@@ -17,3 +33,4 @@ add_executable(eaton_devices main.cpp
     )
 
 target_compile_definitions(eaton_devices PUBLIC -DLOGURU_WITH_STREAMS)
+target_link_libraries(eaton_devices pthread dl)
