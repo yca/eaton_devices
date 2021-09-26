@@ -24,6 +24,10 @@ add_executable(eaton_devices main.cpp
         devices/pressuresensor.h
 	transports/udptransport.cpp
 	transports/udptransport.h
+        transports/tcptransport.cpp
+        transports/tcptransport.h
+        transports/mqtttransport.cpp
+        transports/mqtttransport.h
 	measurements/temperaturemeasurement.cpp
 	measurements/temperaturemeasurement.h
 	measurements/pressuremeasurement.cpp
