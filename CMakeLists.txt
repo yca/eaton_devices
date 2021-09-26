@@ -9,7 +9,7 @@ set(PROJECT_ROOT ${CMAKE_CURRENT_LIST_DIR})
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 
 add_executable(eaton_devices main.cpp
-    uuid.h
+	uuid.h
 	device.cpp
 	device.h
 	measurement.cpp
@@ -18,27 +18,32 @@ add_executable(eaton_devices main.cpp
 	transport.h
 	hub.cpp
 	hub.h
-        devices/ambientsensor.cpp
-        devices/ambientsensor.h
-        devices/pressuresensor.h
-        devices/pressuresensor.h
+	devices/ambientsensor.cpp
+	devices/ambientsensor.h
+	devices/pressuresensor.h
+	devices/pressuresensor.h
 	transports/udptransport.cpp
 	transports/udptransport.h
-        transports/tcptransport.cpp
-        transports/tcptransport.h
-        transports/mqtttransport.cpp
-        transports/mqtttransport.h
+	transports/tcptransport.cpp
+	transports/tcptransport.h
+	transports/mqtttransport.cpp
+	transports/mqtttransport.h
 	measurements/temperaturemeasurement.cpp
 	measurements/temperaturemeasurement.h
 	measurements/pressuremeasurement.cpp
 	measurements/pressuremeasurement.h
 	measurements/humiditymeasurement.cpp
 	measurements/humiditymeasurement.h
-    ${PROJECT_ROOT}/3rdparty/loguru/loguru.cpp
-    ${PROJECT_ROOT}/3rdparty/loguru/loguru.hpp
-    ${PROJECT_ROOT}/3rdparty/loguru/debug.h
-    ${PROJECT_ROOT}/3rdparty/loguru/debug.cpp
-    )
 
+	${PROJECT_ROOT}/3rdparty/loguru/loguru.cpp
+	${PROJECT_ROOT}/3rdparty/loguru/loguru.hpp
+	${PROJECT_ROOT}/3rdparty/loguru/debug.h
+	${PROJECT_ROOT}/3rdparty/loguru/debug.cpp
+)
+
+FIND_PACKAGE(Boost COMPONENTS system REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 target_compile_definitions(eaton_devices PUBLIC -DLOGURU_WITH_STREAMS)
-target_link_libraries(eaton_devices pthread dl)
+
+target_link_libraries(eaton_devices PUBLIC ${Boost_LIBRARIES})
+target_link_libraries(eaton_devices PUBLIC pthread dl)
