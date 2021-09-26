@@ -1,4 +1,9 @@
 #include "ambientsensor.h"
+#include "measurement.h"
+
+#include <3rdparty/loguru/debug.h>
+
+#include <string>
 
 AmbientSensor::AmbientSensor(Transport *transport)
 	: Device(transport)
@@ -6,7 +11,8 @@ AmbientSensor::AmbientSensor(Transport *transport)
 
 }
 
-void AmbientSensor::sendMeasurements()
+void AmbientSensor::takeMeasurements()
 {
-
+	writeMeasurement(ss, Measurement::TEMPERATURE, 12.5);
+	writeMeasurement(ss, Measurement::HUMIDTY, 13.5);
 }

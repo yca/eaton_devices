@@ -8,7 +8,7 @@ class AmbientSensor : public Device
 public:
 	AmbientSensor(Transport *transport);
 
-	void sendMeasurements();
+	void takeMeasurements();
 };
 
 #endif // AMBIENTSENSOR_H

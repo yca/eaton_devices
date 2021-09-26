@@ -3,13 +3,20 @@
 
 #include <transport.h>
 
+#include <string>
+
+class TcpTransportPriv;
+
 class TcpTransport : public Transport
 {
 public:
 	TcpTransport();
 
-	int setup();
+	int setup(const std::string &host, uint16_t port);
 	int send(const char *data, int length);
+
+protected:
+	TcpTransportPriv *p;
 };
 
 #endif // TCPTRANSPORT_H
