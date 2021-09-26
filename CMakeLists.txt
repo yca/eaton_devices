@@ -18,6 +18,10 @@ add_executable(eaton_devices main.cpp
 	transport.h
 	hub.cpp
 	hub.h
+        devices/ambientsensor.cpp
+        devices/ambientsensor.h
+        devices/pressuresensor.h
+        devices/pressuresensor.h
 	transports/udptransport.cpp
 	transports/udptransport.h
 	measurements/temperaturemeasurement.cpp
