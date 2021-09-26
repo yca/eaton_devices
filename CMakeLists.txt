@@ -18,9 +18,11 @@ add_executable(eaton_devices main.cpp
 	transport.h
 	hub.cpp
 	hub.h
+	timing.h
+	arguments.h
 	devices/ambientsensor.cpp
 	devices/ambientsensor.h
-	devices/pressuresensor.h
+	devices/pressuresensor.cpp
 	devices/pressuresensor.h
 	transports/udptransport.cpp
 	transports/udptransport.h
@@ -41,9 +43,8 @@ add_executable(eaton_devices main.cpp
 	${PROJECT_ROOT}/3rdparty/loguru/debug.cpp
 )
 
-FIND_PACKAGE(Boost COMPONENTS system REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
 target_compile_definitions(eaton_devices PUBLIC -DLOGURU_WITH_STREAMS)
-
-target_link_libraries(eaton_devices PUBLIC ${Boost_LIBRARIES})
+target_link_libraries(eaton_devices PUBLIC ${PROJECT_ROOT}/sockpp/libsockpp.a)
+target_link_libraries(eaton_devices PUBLIC ncurses)
+target_link_libraries(eaton_devices PUBLIC unwind)
 target_link_libraries(eaton_devices PUBLIC pthread dl)

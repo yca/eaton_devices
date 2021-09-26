@@ -6,7 +6,9 @@
 class PressureSensor : public Device
 {
 public:
-	PressureSensor();
+	PressureSensor(Transport *transport);
+
+	void sendMeasurements();
 };
 
 #endif // PRESSURESENSOR_H

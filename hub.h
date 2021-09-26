@@ -11,6 +11,8 @@ public:
 	int startTcp(int port);
 
 protected:
+	void printInfo();
+
 	HubPriv *p;
 };
 

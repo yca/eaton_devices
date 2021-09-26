@@ -3,6 +3,8 @@
 
 #include <transport.h>
 
+#include <sstream>
+
 class Device
 {
 public:
@@ -10,6 +12,10 @@ public:
 	virtual ~Device() {}
 
 	virtual void sendMeasurements() = 0;
+
+protected:
+	/* some helper functions */
+	static void writeMeasurement(std::stringstream &ss, int32_t type, float value);
 
 protected:
 	Device() = delete;
