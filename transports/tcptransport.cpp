@@ -13,6 +13,11 @@ TcpTransport::TcpTransport()
 	p = new TcpTransportPriv;
 }
 
+TcpTransport::~TcpTransport()
+{
+	delete p;
+}
+
 int TcpTransport::setup(const std::string &host, uint16_t port)
 {
 	p->conn = sockpp::tcp_connector({host, port});

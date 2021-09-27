@@ -20,7 +20,7 @@
 #include <assert.h>
 #include <ncurses.h>
 
-const uint16_t TCP_SERVER_PORT = 21569;
+const uint16_t SERVER_PORT = 21569;
 
 /* crash handling related */
 typedef void (*sighandler)(int, siginfo_t *, void *);
@@ -43,11 +43,11 @@ public:
 		std::mt19937 rng(dev());
 		std::uniform_int_distribution<std::mt19937::result_type> dist(1, 2);
 		for (int i = 0; i < deviceCount; i++) {
-			gWarn("creating device transport %d", i);
+			gLogV("creating device transport %d", i);
 			auto *transport = createTransport(ttype);
 			assert(transport != nullptr);
 
-			gWarn("creating device %d", i);
+			gLog("creating device %d", i);
 			auto devt = dist(rng);
 			Device *dev = nullptr;
 			if (devt == 1)
@@ -85,13 +85,17 @@ protected:
 	static Transport *createTransport(TransportType ttype)
 	{
 		Transport *t = nullptr;
-		if (ttype == TRANSPORT_UDP)
-			return new UdpTransport();
-		else if (ttype == TRANSPORT_TCP) {
-			TcpTransport *tcp = new TcpTransport();
-			int err = tcp->setup("127.0.0.1", TCP_SERVER_PORT);
+		if (ttype == TRANSPORT_UDP) {
+			auto *udp = new UdpTransport();
+			int err = udp->setup("127.0.0.1", SERVER_PORT);
 			if (err)
-				gWarn("Error connecting to '%s:%d'", "127.0.0.1", TCP_SERVER_PORT);
+				gWarn("Error connecting to '%s:%d'", "127.0.0.1", SERVER_PORT);
+			t = udp;
+		} else if (ttype == TRANSPORT_TCP) {
+			TcpTransport *tcp = new TcpTransport();
+			int err = tcp->setup("127.0.0.1", SERVER_PORT);
+			if (err)
+				gWarn("Error connecting to '%s:%d'", "127.0.0.1", SERVER_PORT);
 			t = tcp;
 		}
 		else if (ttype == TRANSPORT_MQTT)
@@ -160,6 +164,7 @@ int main(int argc, char *argv[])
 		printf("hello\n");
 		return 0;
 	}
+
 	/* install a crash handler for getting a reasonable crash dump */
 	install_sahandler([](int signo, siginfo_t *, void *){
 		fprintf(stderr, "Received signal %d\n", signo);
@@ -199,11 +204,21 @@ int main(int argc, char *argv[])
 	if (argumentExist("--latency"))
 		latms = std::atoi(argumentGet("--latency"));
 	Simulated::TransportType ttype = Simulated::TRANSPORT_TCP;
+	if (argumentExist("--udp"))
+		ttype = Simulated::TRANSPORT_UDP;
+	bool statsEnabled = true;
+	if (argumentExist("--no-stats"))
+		statsEnabled = false;
 
 	gWarn("Initializing local hub");
 	/* start log collection using hub instance */
 	Hub hub;
-	int err = hub.startTcp(TCP_SERVER_PORT);
+	hub.showStats(statsEnabled);
+	int err = -ENOENT;
+	if (ttype == Simulated::TRANSPORT_TCP)
+		err = hub.startTcp(SERVER_PORT);
+	else if (ttype == Simulated::TRANSPORT_UDP)
+		err = hub.startUdp(SERVER_PORT);
 	if (err) {
 		gWarn("Error '%d' starting hub, aborting simulation.", err);
 		return err;

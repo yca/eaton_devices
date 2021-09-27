@@ -3,13 +3,21 @@
 
 #include <transport.h>
 
+#include <string>
+
+class UdpTransportPriv;
+
 class UdpTransport : public Transport
 {
 public:
 	UdpTransport();
+	~UdpTransport();
 
-	int setup();
+	int setup(const std::string &host, uint16_t port);
 	int send(const char *data, int length);
+
+protected:
+	UdpTransportPriv *p;
 };
 
 #endif // UDPTRANSPORT_H

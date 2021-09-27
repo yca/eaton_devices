@@ -7,6 +7,7 @@
 #include "measurements/temperaturemeasurement.h"
 
 #include <sockpp/tcp_socket.h>
+#include <sockpp/udp_socket.h>
 #include <sockpp/tcp_acceptor.h>
 
 #include <3rdparty/loguru/debug.h>
@@ -104,11 +105,52 @@ protected:
 	std::vector<TcpConnection *> connections;
 	std::function<void(std::string, sockpp::tcp_socket &)> rcb;
 };
+#include <unordered_set>
+class UdpServer
+{
+public:
+	UdpServer(int port, std::function<void(const std::string &, sockpp::udp_socket::addr_t &)>
+			  readCallback)
+	{
+		rcb = readCallback;
+		if (!sock.bind(sockpp::inet_address("127.0.0.1", port))) {
+			gWarn("error binding to UDP port %d", port);
+			return;
+		}
+		thr = std::thread([this, port](){
+			char buf[4096];
+			while (1) {
+				sockpp::udp_socket::addr_t addr;
+				int len = sock.recv_from(buf, sizeof(buf), &addr);
+				if (rcb && len > 0)
+					rcb(std::string(buf, len), addr);
+				if (!addr.to_string().empty())
+					peers.insert(addr.to_string());
+			}
+		});
+		running = true;
+	}
+
+	bool isRunning() { return running; }
+
+	size_t peerCount()
+	{
+		return peers.size();
+	}
+
+protected:
+	bool running = false;
+	std::thread thr;
+	sockpp::udp_socket sock;
+	std::unordered_set<std::string> peers;
+	std::function<void(std::string, sockpp::udp_socket::addr_t &)> rcb;
+};
 
 class HubPriv
 {
 public:
 	TcpServer *tcpServer = nullptr;
+	UdpServer *udpServer = nullptr;
 	std::mutex m;
 	std::vector<Measurement *> all;
 	Timing t;
@@ -119,11 +161,28 @@ public:
 	std::unordered_map<std::string, int> latency;
 	std::unordered_map<std::string, Timing *> timers;
 	int printIntervalMsec = 3000;
+	bool printStats = true;
 };
 
 Hub::Hub()
 {
 	p = new HubPriv;
+}
+
+Hub::~Hub()
+{
+	if (p->tcpServer)
+		delete p->tcpServer;
+	if (p->udpServer)
+		delete p->udpServer;
+	for (auto &[k, t]: p->timers)
+		delete t;
+	delete p;
+}
+
+void Hub::showStats(bool enable)
+{
+	p->printStats = enable;
 }
 
 int Hub::startTcp(int port)
@@ -132,64 +191,24 @@ int Hub::startTcp(int port)
 	p->tcpServer = new TcpServer(port, [this](const auto &mes, auto &peerSock){
 		gLogV("new %ld bytes message from '%s'", mes.size(),
 			  peerSock.peer_address().to_string().data());
-
 		std::string uuid = peerSock.peer_address().to_string();
-
-		std::stringstream ss(mes);
-		while (!ss.eof()) {
-			int32_t type = 0;
-			float value = 0;
-			ss.read(reinterpret_cast<char *>(&type), sizeof(int32_t));
-			if (ss.eof())
-				break;
-			ss.read(reinterpret_cast<char *>(&value), sizeof(float));
-			if (ss.eof())
-				break;
-
-			int64_t ts = 0;
-			p->m.lock();
-			if (type == Measurement::HUMIDTY)
-				p->all.push_back(new HumidityMeasurement(ts, value));
-			else if (type == Measurement::PRESSURE)
-				p->all.push_back(new PressureMeasurement(ts, value));
-			else if (type == Measurement::TEMPERATURE)
-				p->all.push_back(new TemperatureMeasurement(ts, value));
-			p->m.unlock();
-		}
-
-		/* measure statistics */
-		p->m.lock();
-		{
-			/* latency */
-			if (!p->timers[uuid])
-				p->timers[uuid] = new Timing;
-			auto *timing = p->timers[uuid];
-			p->latency[uuid] = timing->elapsedMili();
-			timing->restart();
-
-			/* bandwidth */
-
-			/*
-			 * bandwidth and overhead calculation:
-			 *	TCP header: 20 bytes (min)
-			 *	IP header: 20 bytes
-			 *	Ethernet header: 14 bytes
-			 *	some padding (min packet size is 64 bytes on the wire)
-			 */
-			int totalLen = mes.size() + 54;
-			if (totalLen < 64)
-				totalLen = 64;
-			p->payloadTotal += mes.size();
-			p->bytesTotal += totalLen;
-		}
-		p->m.unlock();
-
-		if (p->t.elapsedMili() > p->printIntervalMsec) {
-			p->t.restart();
-			printInfo();
-		}
+		processMessage(mes, uuid);
 	});
 	return 0;
+}
+
+int Hub::startUdp(int port)
+{
+	p->t.start();
+	p->udpServer = new UdpServer(port, [this](const auto &mes, auto &addr){
+		gLog("new %ld bytes message from '%s'", mes.size(),
+			  addr.to_string().data());
+		std::string uuid = addr.to_string();
+		processMessage(mes, uuid);
+	});
+	if (p->udpServer->isRunning())
+		return 0;
+	return -1;
 }
 
 void Hub::printInfo()
@@ -218,7 +237,13 @@ void Hub::printInfo()
 	/* print stats */
 	initscr();
 	clear();
-	printw("we have %ld sensor connections\n", p->tcpServer->connectionCount());
+	if (p->tcpServer) {
+		printw("transport type is TCP\n");
+		printw("we have %ld sensor connections\n", p->tcpServer->connectionCount());
+	} else if (p->udpServer) {
+		printw("transport type is UDP\n");
+		printw("we have %ld sensor connections\n", p->udpServer->peerCount());
+	}
 	printw("recved %ld messages up to now\n", p->mesCount);
 	for (const auto &[key, value]: p->typeCount)
 		printw("\t%ld %s messages\n", value, key.data());
@@ -228,4 +253,81 @@ void Hub::printInfo()
 	printw("communication overhead is calculated as %d\%\n", overhead);
 
 	refresh();
+}
+
+void Hub::processMessage(const std::string &mes, const std::string &uuid)
+{
+	std::stringstream ss(mes);
+	while (!ss.eof()) {
+		int32_t type = 0;
+		float value = 0;
+		ss.read(reinterpret_cast<char *>(&type), sizeof(int32_t));
+		if (ss.eof())
+			break;
+		ss.read(reinterpret_cast<char *>(&value), sizeof(float));
+		if (ss.eof())
+			break;
+
+		int64_t ts = 0;
+		p->m.lock();
+		if (type == Measurement::HUMIDTY)
+			p->all.push_back(new HumidityMeasurement(ts, value));
+		else if (type == Measurement::PRESSURE)
+			p->all.push_back(new PressureMeasurement(ts, value));
+		else if (type == Measurement::TEMPERATURE)
+			p->all.push_back(new TemperatureMeasurement(ts, value));
+		p->m.unlock();
+	}
+
+	/* measure statistics */
+	p->m.lock();
+	{
+		/* latency */
+		if (!p->timers[uuid])
+			p->timers[uuid] = new Timing;
+		auto *timing = p->timers[uuid];
+		p->latency[uuid] = timing->elapsedMili();
+		timing->restart();
+
+		/* bandwidth */
+
+		/* bandwidth and overhead calculation */
+		if (p->tcpServer) {
+			/*
+			 *	TCP header: 20 bytes (min)
+			 *	IP header: 20 bytes
+			 *	Ethernet header: 14 bytes
+			 *	some padding (min packet size is 64 bytes on the wire)
+			 */
+			int totalLen = mes.size() + 54;
+			if (totalLen < 64)
+				totalLen = 64;
+			p->payloadTotal += mes.size();
+			/*
+			 * although we're only recv'ing, so we need to generate
+			 *	an ACK message for every 2 packets, so we add 32 bytes to
+			 *	each message for that.
+			 */
+			p->bytesTotal += totalLen + 32;
+		} else if (p->udpServer) {
+			/*
+			 *	UDP header: 8 bytes
+			 *	IP header: 20 bytes
+			 *	Ethernet header: 14 bytes
+			 *	some padding (min packet size is 64 bytes on the wire)
+			 */
+			int totalLen = mes.size() + 42;
+			if (totalLen < 64)
+				totalLen = 64;
+			p->payloadTotal += mes.size();
+			p->bytesTotal += totalLen;
+		}
+	}
+	p->m.unlock();
+
+	if (p->t.elapsedMili() > p->printIntervalMsec) {
+		p->t.restart();
+		if (p->printStats)
+			printInfo();
+	}
 }

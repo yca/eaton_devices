@@ -1,5 +1,7 @@
 #include "device.h"
 
+#include "3rdparty/loguru/debug.h"
+
 Device::Device(Transport *transport)
 {
 	tr = transport;
