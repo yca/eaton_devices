@@ -162,6 +162,7 @@ public:
 	std::unordered_map<std::string, int> typeCount;
 	std::unordered_map<std::string, int> latency;
 	std::unordered_map<std::string, Timing *> timers;
+	std::unordered_map<std::string, int> messageCountByDev;
 	int printIntervalMsec = 3000;
 	bool printStats = true;
 };
@@ -299,6 +300,7 @@ void Hub::processMessage(const std::string &mes, const std::string &uuid)
 			p->all.push_back(new PressureMeasurement(ts, value));
 		else if (type == Measurement::TEMPERATURE)
 			p->all.push_back(new TemperatureMeasurement(ts, value));
+		p->messageCountByDev[uuid]++;
 		p->m.unlock();
 	}
 
