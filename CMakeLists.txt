@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(PROJECT_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
+include_directories(${CMAKE_CURRENT_LIST_DIR}/3rdparty)
 
 add_executable(eaton_devices main.cpp
 	uuid.h
@@ -44,7 +45,7 @@ add_executable(eaton_devices main.cpp
 )
 
 target_compile_definitions(eaton_devices PUBLIC -DLOGURU_WITH_STREAMS)
-target_link_libraries(eaton_devices PUBLIC ${PROJECT_ROOT}/sockpp/libsockpp.a)
+target_link_libraries(eaton_devices PUBLIC ${PROJECT_ROOT}/3rdparty/sockpp/libsockpp.a)
 target_link_libraries(eaton_devices PUBLIC ncurses)
 target_link_libraries(eaton_devices PUBLIC unwind)
 target_link_libraries(eaton_devices PUBLIC pthread dl)
