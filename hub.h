@@ -15,10 +15,11 @@ public:
 	int startTcp(int port);
 	int startUdp(int port);
 	int startMqtt(int port);
+	void enableDeviceNameReading(bool v);
 
 protected:
 	void printInfo();
-	void processMessage(const std::string &mes, const std::string &uuid);
+	void processMessage(const std::string &mes, const std::string &addr);
 
 	HubPriv *p;
 };

@@ -37,7 +37,7 @@ public:
 		TRANSPORT_MQTT,
 	};
 
-	Simulated(int deviceCount, TransportType ttype)
+	Simulated(int deviceCount, TransportType ttype, bool names)
 	{
 		std::random_device dev;
 		std::mt19937 rng(dev());
@@ -56,6 +56,7 @@ public:
 				dev = new PressureSensor(transport);
 			else
 				dev = new AmbientSensor(transport);
+			dev->sendDeviceName(names);
 			devices.push_back(dev);
 
 		}
@@ -162,6 +163,7 @@ int main(int argc, char *argv[])
 		printf("--udp:		[none] Enables UDP transport for the simulation.\n");
 		printf("--mqtt:		[none] Enables MQTT transport for the simulation.\n");
 		printf("--no-stats:	[none] Do not print ncurses statistics, helpful during debugging.\n");
+		printf("--names:	[none] Show device names instead of endpoint addresses.\n");
 		return 0;
 	}
 
@@ -211,11 +213,15 @@ int main(int argc, char *argv[])
 	bool statsEnabled = true;
 	if (argumentExist("--no-stats"))
 		statsEnabled = false;
+	bool useDeviceNames = false;
+	if (argumentExist("--names"))
+		useDeviceNames = true;
 
 	gWarn("Initializing local hub");
 	/* start log collection using hub instance */
 	Hub hub;
 	hub.showStats(statsEnabled);
+	hub.enableDeviceNameReading(useDeviceNames);
 	int err = -ENOENT;
 	if (ttype == Simulated::TRANSPORT_TCP)
 		err = hub.startTcp(SERVER_PORT);
@@ -230,6 +236,6 @@ int main(int argc, char *argv[])
 
 	gWarn("starting simulation");
 	/* create and start simulation */
-	Simulated sim(devcnt, ttype);
+	Simulated sim(devcnt, ttype, useDeviceNames);
 	return sim.runSimulation(sampms, latms);
 }

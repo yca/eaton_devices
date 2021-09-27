@@ -13,6 +13,7 @@ public:
 
 	virtual void takeMeasurements() = 0;
 	void sendMeasurements();
+	void sendDeviceName(bool v);
 
 protected:
 	/* some helper functions */
@@ -23,6 +24,8 @@ protected:
 
 	Transport *tr;
 	std::stringstream ss;
+	bool sendDeviceNameWithMessages;
+	std::string uuid;
 };
 
 #endif // DEVICE_H

@@ -1,4 +1,5 @@
 #include "hub.h"
+#include "uuid.h"
 #include "timing.h"
 #include "measurement.h"
 
@@ -165,11 +166,14 @@ public:
 	std::unordered_map<std::string, int> messageCountByDev;
 	int printIntervalMsec = 3000;
 	bool printStats = true;
+	bool readDeviceNames = false;
+	std::string uuid;
 };
 
 Hub::Hub()
 {
 	p = new HubPriv;
+	p->uuid = uuid::generate_uuid_v4();
 }
 
 Hub::~Hub()
@@ -196,8 +200,7 @@ int Hub::startTcp(int port)
 	p->tcpServer = new TcpServer(port, [this](const auto &mes, auto &peerSock){
 		gLogV("new %ld bytes message from '%s'", mes.size(),
 			  peerSock.peer_address().to_string().data());
-		std::string uuid = peerSock.peer_address().to_string();
-		processMessage(mes, uuid);
+		processMessage(mes, peerSock.peer_address().to_string());
 	});
 	return 0;
 }
@@ -208,8 +211,7 @@ int Hub::startUdp(int port)
 	p->udpServer = new UdpServer(port, [this](const auto &mes, auto &addr){
 		gLog("new %ld bytes message from '%s'", mes.size(),
 			  addr.to_string().data());
-		std::string uuid = addr.to_string();
-		processMessage(mes, uuid);
+		processMessage(mes, addr.to_string());
 	});
 	if (p->udpServer->isRunning())
 		return 0;
@@ -226,6 +228,11 @@ int Hub::startMqtt(int port)
 		processMessage(mes, uuid);
 	});
 	return 0;
+}
+
+void Hub::enableDeviceNameReading(bool v)
+{
+	p->readDeviceNames = v;
 }
 
 void Hub::printInfo()
@@ -271,17 +278,26 @@ void Hub::printInfo()
 	printw("average latency is calculated as %d milliseconds\n", lavg);
 	printw("total bandwidth is is calculated as %.2lf kbits / sec\n", double(bps) / 1000.0);
 	printw("communication overhead is calculated as %d\%\n", overhead);
+	printw("message count by device:\n");
+	for (const auto &[key, value]: p->messageCountByDev)
+		printw("\t%s: %ld messages\n", key.data(), value);
 
 	refresh();
 }
 
-void Hub::processMessage(const std::string &mes, const std::string &uuid)
+void Hub::processMessage(const std::string &mes, const std::string &addr)
 {
 	std::stringstream ss(mes);
 	if (p->mqttServer && mes.size() <= 128)
 		ss.seekg(2);
 	else if (p->mqttServer)
 		ss.seekg(3);
+	std::string uuid;
+	uuid.resize(p->uuid.size());
+	if (p->readDeviceNames)
+		ss.read(uuid.data(), p->uuid.size());
+	else
+		uuid = addr;
 	while (!ss.eof()) {
 		int32_t type = 0;
 		float value = 0;
@@ -314,7 +330,15 @@ void Hub::processMessage(const std::string &mes, const std::string &uuid)
 		p->latency[uuid] = timing->elapsedMili();
 		timing->restart();
 
-		/* bandwidth */
+		auto overheadHelper = [&](int hdrSize){
+			int totalLen = mes.size() + hdrSize;
+			if (totalLen < 64)
+				totalLen = 64;
+			p->payloadTotal += mes.size();
+			if (p->readDeviceNames)
+				p->payloadTotal -= p->uuid.size();
+			p->bytesTotal += totalLen;
+		};
 
 		/* bandwidth and overhead calculation */
 		if (p->tcpServer) {
@@ -324,16 +348,13 @@ void Hub::processMessage(const std::string &mes, const std::string &uuid)
 			 *	Ethernet header: 14 bytes
 			 *	some padding (min packet size is 64 bytes on the wire)
 			 */
-			int totalLen = mes.size() + 54;
-			if (totalLen < 64)
-				totalLen = 64;
-			p->payloadTotal += mes.size();
+			overheadHelper(54);
 			/*
 			 * although we're only recv'ing, so we need to generate
 			 *	an ACK message for every 2 packets, so we add 32 bytes to
 			 *	each message for that.
 			 */
-			p->bytesTotal += totalLen + 32;
+			p->bytesTotal += 32;
 		} else if (p->udpServer) {
 			/*
 			 *	UDP header: 8 bytes
@@ -341,11 +362,7 @@ void Hub::processMessage(const std::string &mes, const std::string &uuid)
 			 *	Ethernet header: 14 bytes
 			 *	some padding (min packet size is 64 bytes on the wire)
 			 */
-			int totalLen = mes.size() + 42;
-			if (totalLen < 64)
-				totalLen = 64;
-			p->payloadTotal += mes.size();
-			p->bytesTotal += totalLen;
+			overheadHelper(42);
 		} else if (p->mqttServer) {
 			/*
 			 *  MQTT header: 2 or 3 bytes
@@ -354,20 +371,16 @@ void Hub::processMessage(const std::string &mes, const std::string &uuid)
 			 *	Ethernet header: 14 bytes
 			 *	some padding (min packet size is 64 bytes on the wire)
 			 */
-			int totalLen = mes.size() + 54;
-			if (totalLen < 64)
-				totalLen = 64;
-			p->payloadTotal += mes.size();
+			if (mes.size() <= 128)
+				overheadHelper(56);
+			else
+				overheadHelper(57);
 			/*
 			 * although we're only recv'ing, so we need to generate
 			 *	an ACK message for every 2 packets, so we add 32 bytes to
 			 *	each message for that.
 			 */
-			p->bytesTotal += totalLen + 32;
-			if (mes.size() <= 128)
-				p->bytesTotal += 2;
-			else
-				p->bytesTotal += 3;
+			p->bytesTotal += 32;
 		}
 	}
 	p->m.unlock();
