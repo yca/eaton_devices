@@ -16,6 +16,7 @@
 
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
 class TcpConnection
 {
@@ -105,7 +106,7 @@ protected:
 	std::vector<TcpConnection *> connections;
 	std::function<void(std::string, sockpp::tcp_socket &)> rcb;
 };
-#include <unordered_set>
+
 class UdpServer
 {
 public:
