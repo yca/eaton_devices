@@ -14,6 +14,7 @@ public:
 	void showStats(bool enable);
 	int startTcp(int port);
 	int startUdp(int port);
+	int startMqtt(int port);
 
 protected:
 	void printInfo();

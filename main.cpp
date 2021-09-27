@@ -85,21 +85,16 @@ protected:
 	static Transport *createTransport(TransportType ttype)
 	{
 		Transport *t = nullptr;
-		if (ttype == TRANSPORT_UDP) {
-			auto *udp = new UdpTransport();
-			int err = udp->setup("127.0.0.1", SERVER_PORT);
-			if (err)
-				gWarn("Error connecting to '%s:%d'", "127.0.0.1", SERVER_PORT);
-			t = udp;
-		} else if (ttype == TRANSPORT_TCP) {
-			TcpTransport *tcp = new TcpTransport();
-			int err = tcp->setup("127.0.0.1", SERVER_PORT);
-			if (err)
-				gWarn("Error connecting to '%s:%d'", "127.0.0.1", SERVER_PORT);
-			t = tcp;
-		}
+		if (ttype == TRANSPORT_UDP)
+			t = new UdpTransport();
+		else if (ttype == TRANSPORT_TCP)
+			t = new TcpTransport();
 		else if (ttype == TRANSPORT_MQTT)
-			return new MqttTransport();
+			t = new MqttTransport();
+
+		int err = t->setup("127.0.0.1", SERVER_PORT);
+		if (err)
+			gWarn("Error connecting to '%s:%d'", "127.0.0.1", SERVER_PORT);
 
 		return t;
 	}
@@ -206,6 +201,8 @@ int main(int argc, char *argv[])
 	Simulated::TransportType ttype = Simulated::TRANSPORT_TCP;
 	if (argumentExist("--udp"))
 		ttype = Simulated::TRANSPORT_UDP;
+	if (argumentExist("--mqtt"))
+		ttype = Simulated::TRANSPORT_MQTT;
 	bool statsEnabled = true;
 	if (argumentExist("--no-stats"))
 		statsEnabled = false;
@@ -219,6 +216,8 @@ int main(int argc, char *argv[])
 		err = hub.startTcp(SERVER_PORT);
 	else if (ttype == Simulated::TRANSPORT_UDP)
 		err = hub.startUdp(SERVER_PORT);
+	else if (ttype == Simulated::TRANSPORT_MQTT)
+		err = hub.startMqtt(SERVER_PORT);
 	if (err) {
 		gWarn("Error '%d' starting hub, aborting simulation.", err);
 		return err;

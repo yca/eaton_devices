@@ -1,14 +1,14 @@
 #ifndef MQTTTRANSPORT_H
 #define MQTTTRANSPORT_H
 
-#include <transport.h>
+#include "tcptransport.h"
 
-class MqttTransport : public Transport
+class MqttTransport : public TcpTransport
 {
 public:
 	MqttTransport();
 
-	int setup();
+	int setup(const std::string &host, uint16_t port);
 	int send(const char *data, int length);
 };
 

@@ -150,6 +150,7 @@ class HubPriv
 {
 public:
 	TcpServer *tcpServer = nullptr;
+	TcpServer *mqttServer = nullptr;
 	UdpServer *udpServer = nullptr;
 	std::mutex m;
 	std::vector<Measurement *> all;
@@ -175,6 +176,8 @@ Hub::~Hub()
 		delete p->tcpServer;
 	if (p->udpServer)
 		delete p->udpServer;
+	if (p->mqttServer)
+		delete p->mqttServer;
 	for (auto &[k, t]: p->timers)
 		delete t;
 	delete p;
@@ -211,6 +214,18 @@ int Hub::startUdp(int port)
 	return -1;
 }
 
+int Hub::startMqtt(int port)
+{
+	p->t.start();
+	p->mqttServer = new TcpServer(port, [this](const auto &mes, auto &peerSock){
+		gLogV("new %ld bytes message from '%s'", mes.size(),
+			  peerSock.peer_address().to_string().data());
+		std::string uuid = peerSock.peer_address().to_string();
+		processMessage(mes, uuid);
+	});
+	return 0;
+}
+
 void Hub::printInfo()
 {
 	p->m.lock();
@@ -243,6 +258,9 @@ void Hub::printInfo()
 	} else if (p->udpServer) {
 		printw("transport type is UDP\n");
 		printw("we have %ld sensor connections\n", p->udpServer->peerCount());
+	} else if (p->mqttServer) {
+		printw("transport type is MQTT\n");
+		printw("we have %ld sensor connections\n", p->mqttServer->connectionCount());
 	}
 	printw("recved %ld messages up to now\n", p->mesCount);
 	for (const auto &[key, value]: p->typeCount)
@@ -258,6 +276,10 @@ void Hub::printInfo()
 void Hub::processMessage(const std::string &mes, const std::string &uuid)
 {
 	std::stringstream ss(mes);
+	if (p->mqttServer && mes.size() <= 128)
+		ss.seekg(2);
+	else if (p->mqttServer)
+		ss.seekg(3);
 	while (!ss.eof()) {
 		int32_t type = 0;
 		float value = 0;
@@ -321,6 +343,28 @@ void Hub::processMessage(const std::string &mes, const std::string &uuid)
 				totalLen = 64;
 			p->payloadTotal += mes.size();
 			p->bytesTotal += totalLen;
+		} else if (p->mqttServer) {
+			/*
+			 *  MQTT header: 2 or 3 bytes
+			 *	TCP header: 20 bytes (min)
+			 *	IP header: 20 bytes
+			 *	Ethernet header: 14 bytes
+			 *	some padding (min packet size is 64 bytes on the wire)
+			 */
+			int totalLen = mes.size() + 54;
+			if (totalLen < 64)
+				totalLen = 64;
+			p->payloadTotal += mes.size();
+			/*
+			 * although we're only recv'ing, so we need to generate
+			 *	an ACK message for every 2 packets, so we add 32 bytes to
+			 *	each message for that.
+			 */
+			p->bytesTotal += totalLen + 32;
+			if (mes.size() <= 128)
+				p->bytesTotal += 2;
+			else
+				p->bytesTotal += 3;
 		}
 	}
 	p->m.unlock();
