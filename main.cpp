@@ -156,7 +156,12 @@ static inline void unwind_backtrace()
 int main(int argc, char *argv[])
 {
 	if (argumentExist("--help")) {
-		printf("hello\n");
+		printf("--devices:	[int] Select number of devices to create for simulation. (default=10)\n");
+		printf("--sampling:	[int] Select the sensor sampling interval in milliseconds. (default=10)\n");
+		printf("--latency:	[int] Select communication latency in milliseconds. (default=50)\n");
+		printf("--udp:		[none] Enables UDP transport for the simulation.\n");
+		printf("--mqtt:		[none] Enables MQTT transport for the simulation.\n");
+		printf("--no-stats:	[none] Do not print ncurses statistics, helpful during debugging.\n");
 		return 0;
 	}
 
