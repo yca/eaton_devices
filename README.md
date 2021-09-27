@@ -123,4 +123,45 @@ This repository implements both options. First one delivers us with a lower late
 
 >Communication interval and latency are used interchangibly in the context of this project.
 
-## Code structure
+## Code architecture
+
+- Main component of the project is the Hub class.
+- Simulation codes reside in main.cpp.
+- All 3rd party, external codes reside under 3rdparty folder. sockpp and loguru are external components in use.
+
+
+### Transport architecture
+
+Different transport types are implemented under transports/ folder. They are all inherited from Transport class which resides under transport.{cpp| h} files.
+
+Every transport should implement 2 functions:
+
+- setup function
+- send function
+
+Transport classes are used in simulation, Hub class doesn't use this classes as it implements different servers for different types of transports.
+
+### Measurements and devices
+
+Similar to transport architecture, simulation uses different device types all of which should derive from the Device class implemented in device.{cpp|h}. Different device types should implement 'takeMeasurements()' function and add their custom measurements.
+
+Each measurement have a type, a name and a unit. These are used by device hub for informational purposes.
+
+## Communication protocol
+
+Communication between devices and hub is modeled to be as light as possible for the following reasons:
+
+1. In real life scenarios, iot devices have relatively lower CPU and memory budgets compared to hub devices and devices are in mucher higher cardinality. For this reason, it is beneficial to put more responsibility to the hub side than the device side.
+2. Although communication scheme selected is relatively simple and assuming many real-world challenges as non-existent, it is a perfect choice for showing latency-bandwidth trade-offs which should be considered for all IOT projects in the first place.
+
+For these purposes, we employ a binary protocol with no header. Every device writes their measurements to a byte stream with the following structure:
+
+    measurement_type [32-bit integer], measturement value [32-bit single precision floating point number]
+
+>For the sake of simplicity, device and hub hardware architectures are assumed to have the same endianness.
+
+Devices may append as many as {type, value} pairs one and one each other in a single message.
+
+> Transport layer packet re-ordering, out-of-order packet arrival, transport layer fragmentations, maximum transmission units (MTUs) related issues are assumed to be non-existent. In a real life scenario, a properly designed protocol should take these into account.
+
+In addition to {type, value} pairs, communication messages may start with a unique device identifier, which is optional. This option can be activated with "--name" command line switch. This option increases message communication overhead, esspecially with lower latency values.
